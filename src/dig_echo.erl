@@ -31,6 +31,8 @@ handle_call(_Request, _From, State) ->
 
 
 handle_cast({echo, Socket, IP, Port, Query}, State) ->
+    MessageHeader = dig_message_header:message_header_from_wire(Query),
+    dig_message_header:message_header_print(MessageHeader),
     Response = dig_message_header:message_header_set_qr(Query),
     case gen_udp:send(Socket, IP, Port, Response) of
         ok ->

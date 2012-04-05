@@ -31,24 +31,24 @@
                          additional_sec_count
                          }).
 
--define(OPCODE_STR, [   'NOERROR',
-                         'FORMERR',
-                         'SERVFAIL',
-                         'NXDOMAIN',
-                         'NOTIMP',
-                         'REFUSED',
-                         'YXDOMAIN',
-                         'YXRRSET',
-                         'NXRRSET',
-                         'NOTAUTH',
-                         'NOTZONE']).
+-define(RCODE_STR, ["NOERROR",
+                    "FORMERR",
+                    "SERVFAIL",
+                    "NXDOMAIN",
+                    "NOTIMP",
+                    "REFUSED",
+                    "YXDOMAIN",
+                    "YXRRSET",
+                    "NXRRSET",
+                    "NOTAUTH",
+                    "NOTZONE"]).
 
 
--define(RCODE_STR, [ 'QUERY',
-                     'INVERSE',
-                     'STATUS',
-                     'UNKNOWN',
-                     'NOTIFY',
-                     'UPDATE']).
+-define(OPCODE_STR,[ "QUERY",
+                     "INVERSE",
+                     "STATUS",
+                     "UNKNOWN",
+                     "NOTIFY",
+                     "UPDATE"]).
 
 

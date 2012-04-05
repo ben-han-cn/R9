@@ -10,8 +10,7 @@
 -record(state, {
             socket_,
             is_running_,
-            children_ ,
-            next_child_to_query = 1
+            children_  %lists store all the children's name
         }).
 -define(SERVER, ?MODULE).
 
@@ -38,7 +37,7 @@ handle_call({run, Port}, _From, State) ->
                 lists:foreach(fun (Child) ->
                                 dig_echo:start_link(Child)
                               end,
-                tuple_to_list(State#state.children_)),
+                State#state.children_),
 
                 {reply, ok, State#state{socket_ = Socket, is_running_ = true} };
             {error, _Reason} ->
@@ -49,7 +48,7 @@ handle_call(stop, _From, State) ->
     lists:foreach(fun (Child) ->
                     dig_echo:stop(Child)
                   end,
-                  tuple_to_list(State#state.children_)),
+                  State#state.children_),
     gen_udp:close(State#state.socket_),
     {stop, normal, ok, State};
 
@@ -60,14 +59,13 @@ handle_cast(_Msg, State) ->
   {noreply, State}.
 
 handle_info({udp, Socket, IP, Port, Packet}, State) ->
-    ChildToQuery = State#state.next_child_to_query,
-    dig_echo:handle_query(element(ChildToQuery, State#state.children_),
+    [ChildToQuery | RestChild] = State#state.children_,
+    dig_echo:handle_query(ChildToQuery,
                           Socket,
                           IP,
                           Port,
                           Packet),
-    NextChildToQuery = next_child_to_query(ChildToQuery, State),
-    {noreply, State#state{next_child_to_query = NextChildToQuery}}.
+                      {noreply, State#state{children_ = lists:append(RestChild, [ChildToQuery])}}.
 
 terminate(_Reason, _State) ->
   ok.
@@ -77,20 +75,11 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 create_child(Count) ->
-    create_child_helper(Count, {}).
+    lists:map(fun (ChildNum) ->
+                list_to_atom(lists:concat([child, ChildNum]))
+              end, 
+              lists:seq(1, Count)).
 
-create_child_helper(0, Children) ->
-    Children;
-create_child_helper(N, Children) ->
-    NewChildren = erlang:append_element(Children, list_to_atom(lists:concat([child, N]))),
-    create_child_helper(N - 1, NewChildren).
-
-next_child_to_query(CurrentChildIndex, State) ->
-    ChildCount = tuple_size(State#state.children_),
-    if 
-        CurrentChildIndex =:= ChildCount ->  1;
-        true -> CurrentChildIndex + 1
-    end.
  
 
 
