@@ -52,3 +52,4 @@
                      "UPDATE"]).
 
 
+-define(TEST, true).

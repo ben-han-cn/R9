@@ -10,7 +10,8 @@
 -record(state, {
             socket_,
             is_running_,
-            children_  %lists store all the children's name
+            child_count_ = 0,
+            children_ = []  %lists store all the children's pid
         }).
 -define(SERVER, ?MODULE).
 
@@ -25,7 +26,8 @@ stop() ->
 
 
 init([ChildCount]) ->
-    {ok, #state{is_running_ = false, children_ = create_child(ChildCount)}}.
+    process_flag(trap_exit, true),
+    {ok, #state{is_running_ = false, child_count_ = ChildCount}}.
 
 handle_call({run, _Port}, _From, State) when State#state.is_running_ ->
         io:format("server already run"),
@@ -34,12 +36,13 @@ handle_call({run, Port}, _From, State) ->
         case gen_udp:open(Port, [binary]) of
             {ok, Socket} ->
                 io:format("server start to run ~n"),
-                lists:foreach(fun (Child) ->
-                                dig_echo:start_link(Child)
-                              end,
-                State#state.children_),
-
-                {reply, ok, State#state{socket_ = Socket, is_running_ = true} };
+                Children = lists:foldl(fun (_Index, ChildrenTmp) ->
+                                            {ok, Child} = dig_echo:start_link(),
+                                            [Child | ChildrenTmp]
+                                       end,
+                                       [],
+                                       lists:seq(1, State#state.child_count_)),
+                {reply, ok, State#state{socket_ = Socket, is_running_ = true, children_ = Children}};
             {error, _Reason} ->
                 {reply, error, State}
         end;
@@ -65,21 +68,22 @@ handle_info({udp, Socket, IP, Port, Packet}, State) ->
                           IP,
                           Port,
                           Packet),
-                      {noreply, State#state{children_ = lists:append(RestChild, [ChildToQuery])}}.
+                      {noreply, State#state{children_ = lists:append(RestChild, [ChildToQuery])}};
+handle_info({'EXIT', Pid, _Reason}, State) ->
+    ActiveChildren = State#state.children_,
+    case lists:member(Pid, ActiveChildren) of 
+        true -> 
+            io:format("process [~p] dead restart new process ~n", [Pid]),
+            {ok, NewChild} = dig_echo:start_link(),
+            {noreply, State#state{children_ = [NewChild | lists:delete(Pid, ActiveChildren)]}};
+        _ ->
+            io:format("unknown process dead [~p] ~n", [Pid]),
+            {noreply, State}
+    end.
 
 terminate(_Reason, _State) ->
   ok.
 
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
-
-
-create_child(Count) ->
-    lists:map(fun (ChildNum) ->
-                list_to_atom(lists:concat([child, ChildNum]))
-              end, 
-              lists:seq(1, Count)).
-
- 
-
 

@@ -6,8 +6,7 @@
 
 -include("dig_dns.hrl").
 
-message_header_from_wire(WireData) ->
-    validate_wire_message(WireData),
+message_header_from_wire(WireData) when is_bitstring(WireData) and (byte_size(WireData) >= 12) ->
     <<ID:16/integer-big, Flags:16/integer-big, QuestionCount:16/integer-big, AnswerCount:16/integer-big, AuthorityCount:16/integer-big, AdditionalCount:16/integer-big, _Question/bits>> = WireData,
     <<Qr:1/integer, Opcode:4/integer, AA:1/integer, TC:1/integer, RD:1/integer, RA:1/integer, _Z:3/integer, RCode:4/integer >> = <<Flags:16>>,
     #message_header{id = ID, 
@@ -24,8 +23,7 @@ message_header_from_wire(WireData) ->
                     additional_sec_count = AdditionalCount}.
 
 
-message_header_set_qr(WireData) ->
-    validate_wire_message(WireData),
+message_header_set_qr(WireData) when is_bitstring(WireData) and (byte_size(WireData) >= 12) ->
     <<ID:16/bits, Flags:15/bits, _Qr:1, Others/bits>> = WireData,
     <<ID:16/bits, 1:1/integer, Flags:15/bits, Others/bits>>.
 
@@ -59,12 +57,16 @@ opcode_to_str(Opcode) ->
 rcode_to_str(Rcode) ->
     lists:nth(Rcode + 1, ?RCODE_STR).
 
-%% according to RFC1034, message header should bigger than 12
-%% we won't handle query bigger than 512
-validate_wire_message(Message) ->
-    if
-        not is_bitstring(Message) -> throw("message should be binary");
-        byte_size(Message) < 12 -> throw ("message is too short");
-        byte_size(Message) > 512 -> throw ("message is too log");
-        true -> ok
-    end.
+
+
+
+%%
+%% Tests
+%%
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+dig_message_header_test()->
+    TwoShortData = <<1>>,
+    ?assertException(error, function_clause, message_header_from_wire(TwoShortData)).
+-endif.
+

@@ -1,6 +1,6 @@
 -module (dig_echo).
 -behaviour(gen_server).
--export([start_link/1, handle_query/5, stop/1]).
+-export([start_link/0, handle_query/5, stop/1]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
@@ -9,14 +9,14 @@
         }).
 -define(SERVER, ?MODULE).
 
-start_link(Name) ->
-    gen_server:start_link({local, Name}, ?MODULE, [], []).
+start_link() ->
+    gen_server:start_link(?MODULE, [], []).
 
-handle_query(Name, Socket, IP, Port, Packet) ->
-    gen_server:cast(Name, {echo, Socket, IP, Port, Packet}).
+handle_query(Pid, Socket, IP, Port, Packet) ->
+    gen_server:cast(Pid, {echo, Socket, IP, Port, Packet}).
 
-stop(Name) ->
-    gen_server:call(Name, stop).
+stop(Pid) ->
+    gen_server:call(Pid, stop).
 
 
 init([]) ->
