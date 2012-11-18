@@ -38,7 +38,7 @@ label_to_string(#label{str = Str}) ->
     Str.
 
 label_from_wire(WholeMessage, CurrentPos) ->
-    DataToParse = binary:part(WholeMessage, CurrentPos, byte_size(WholeMessage) - CurrentPos),
+    DataToParse = r9_util:binary_rest(WholeMessage, CurrentPos),
     <<Len:8/integer, LeftData/bits>> = DataToParse,
     if
         Len == 0 -> {?EMPTY_LABEL, CurrentPos + 1};
@@ -92,7 +92,7 @@ labels_from_wire(WholeMessage, CurrentPos) ->
         true -> {lists:reverse(Labels), NextPos}
     end.
 
-
+% [TODO] add len and label count check
 labels_from_string(Str) ->
     if
         Str == "." -> [?EMPTY_LABEL]; 
@@ -102,7 +102,6 @@ labels_from_string(Str) ->
 
 labels_is_equal([], []) -> true;
 labels_is_equal(Labels1, Labels2) ->
-    io:format("<<<<< ~p ~p >> ~n", [Labels1, Labels2]),
     {[Label1 | Labels1Left], [Label2 | Labels2Left]} = {Labels1, Labels2},
     label_is_equal(Label1, Label2) and labels_is_equal(Labels1Left, Labels2Left).
     

@@ -69,7 +69,9 @@
 -define(TYPE_MX,15).    % Mail eXchange
 -define(TYPE_TXT,16).   % Text Strings
 
--define(A_ROOT_SERVERS_NET,{198,41,0,4}).
+
+-define(CLASS_IN, 1).   % Text Strings
+
 
 -define(QTYPE_AXFR,252).     % Request a zone transfer
 -define(QTYPE_MAILB,253).    % Request mailbox-related records (MB, MR or MR)
