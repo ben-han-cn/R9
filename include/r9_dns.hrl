@@ -79,3 +79,19 @@
 -define(QTYPE_MAILA,254).    % Request Mail Agent RR (Obsolete)
 -define(QTYPE_WILDCARD,255). % Request All Records
 -define(TEST, true).
+
+
+%rdata struct
+-record(a, {ip}).
+-record(aaaa, {ip}).
+-record(domain, {domain}).
+-record(mx, {preference,
+             exchange}).
+-record(soa, {mname,
+              rname,
+              serial,
+              refresh,
+              retry,
+              expire,
+              minimum}).
+

@@ -15,18 +15,6 @@
              rdlen, 
              rdata}). 
 
--record(a, {ip}).
--record(aaaa, {ip}).
--record(domain, {domain}).
--record(mx, {preference,
-             exchange}).
--record(soa, {mname,
-              rname,
-              serial,
-              refresh,
-              retry,
-              expire,
-              minimum}).
 
 %rdata API
 rdata_from_string("A", IP) ->
