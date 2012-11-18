@@ -1,5 +1,5 @@
 -module(r9_wire_name).
--export([from_wire/1,
+-export([from_wire/2,
          from_string/1,
          to_string/1,
          to_wire/1,
@@ -37,13 +37,19 @@ label_from_string(Str) ->
 label_to_string(#label{str = Str}) ->
     Str.
 
-label_from_wire(<<Len:8/integer, NameStr:Len/bytes, LeftData/bits>>) ->
-    Label = if 
-                Len == 0 -> ?EMPTY_LABEL;
-                (Len < ?MAX_LABEL_LEN)  -> #label{len = Len + 1, 
-                                                  str = string:to_lower(binary_to_list(NameStr))}
-            end,
-    {Label, LeftData}.
+label_from_wire(WholeMessage, CurrentPos) ->
+    DataToParse = binary:part(WholeMessage, CurrentPos, byte_size(WholeMessage) - CurrentPos),
+    <<Len:8/integer, LeftData/bits>> = DataToParse,
+    if
+        Len == 0 -> {?EMPTY_LABEL, CurrentPos + 1};
+        (Len < ?MAX_LABEL_LEN) and (CurrentPos + Len < byte_size(WholeMessage))  -> 
+                    << NameStr:Len/bytes, _/bits>> = LeftData,
+                    {#label{len = Len + 1, str = string:to_lower(binary_to_list(NameStr))}, CurrentPos + Len + 1};
+        true -> <<2#11:2, LeftPos:6/integer, NextLeftPos:8/integer, _/bits>> = DataToParse,
+                <<RealLabelPos:16>> = <<LeftPos:6, 0:2, NextLeftPos:8>>,
+                label_from_wire(WholeMessage, RealLabelPos)
+    end.
+                                                                            
 
 label_to_wire(#label{len = Len, str = Str}) ->
     list_to_binary([Len - 1, Str]).
@@ -72,16 +78,19 @@ labels_compare(Labels1, Labels2) ->
 
 
 %% labels API
-labels_from_wire_helper(WireData, Acc) ->
-    {Label, LeftData}  = label_from_wire(WireData),
+labels_from_wire_helper(WholeMessage, CurrentPos, Acc) ->
+    {Label, NextPos}  = label_from_wire(WholeMessage, CurrentPos),
     case Label#label.len of
-        1 -> {[Label | Acc], LeftData};
-        _ -> labels_from_wire_helper(LeftData, [Label | Acc])
+        1 -> {[Label | Acc], NextPos};
+        _ -> labels_from_wire_helper(WholeMessage, NextPos, [Label | Acc])
     end.
 
-labels_from_wire(WireData) ->
-    {Labels, LeftData} = labels_from_wire_helper(WireData, []),
-    {lists:reverse(Labels), LeftData}.
+labels_from_wire(WholeMessage, CurrentPos) ->
+    {Labels, NextPos} = labels_from_wire_helper(WholeMessage, CurrentPos, []),
+    if 
+        NextPos < CurrentPos -> {lists:reverse(Labels), CurrentPos + 2};
+        true -> {lists:reverse(Labels), NextPos}
+    end.
 
 
 labels_from_string(Str) ->
@@ -109,8 +118,8 @@ from_lables(Labels) ->
                label_count = length(Labels),
                labels = Labels}.
 
-from_wire(WireData) ->
-    {Labels, LeftData} = labels_from_wire(WireData),
+from_wire(WholeMessage, CurrentPos) ->
+    {Labels, LeftData} = labels_from_wire(WholeMessage, CurrentPos),
     {from_lables(Labels), LeftData}.
 
 to_wire(#wire_name{labels = Labels}) ->
@@ -175,18 +184,23 @@ parent(Name) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-from_wire_discard_left(WireData) ->
-    element(1, from_wire(WireData)).
-
 from_wire_test()->
     Com = <<3, $c, $o, $m, 0>>,
-    Name = from_wire_discard_left(Com),
+    {Name, NextPos} = from_wire(Com, 0),
     ?assertEqual(len(Name), 5),
-    ?assertEqual(label_count(Name), 2).
+    ?assertEqual(label_count(Name), 2),
+    ?assertEqual(NextPos, 5),
+    %compress message test
+    KnetCNMsg = <<16#44,16#34,16#80,16#80,16#0,16#1,16#0,16#4,16#0,16#0,16#0,16#0,16#4,16#6b,16#6e,16#65,16#74,16#2,16#63,16#6e,16#0,16#0,16#2,16#0,16#1,16#c0,16#c>>,
+    {KNetCNName, NextMsgPos} = from_wire(KnetCNMsg, 25),
+    ?assert(is_equal(from_string("knet.cn"), KNetCNName)),
+    ?assertEqual(NextMsgPos, 27).
+
+
 
 from_to_string_test()->
     ACom= <<1, $A, 3, $c, $O, $m, 0 >>,
-    Name = from_wire_discard_left(ACom),
+    {Name, _} = from_wire(ACom, 0),
     Str = "a.com.",
     ?assertEqual(to_string(Name), Str),
     NewName = from_string(Str),
@@ -196,20 +210,20 @@ from_to_string_test()->
 
 is_equal_test() ->
     ACom= <<1, $A, 3, $c, $O, $m, 0 >>,
-    Name1 = from_wire_discard_left(ACom),
+    {Name1, _} = from_wire(ACom, 0),
     ACom2 = <<1, $A, 3, $c, $O, $m, 0 >>,
-    Name2 = from_wire_discard_left(ACom2),
+    {Name2, _} = from_wire(ACom2, 0),
     ?assert(is_equal(Name1, Name2)),
     ACom3 = <<1, $A, 3, $C, $O, $m, 0 >>,
-    Name3 = from_wire_discard_left(ACom3),
+    {Name3, _} = from_wire(ACom3, 0),
     ?assert(is_equal(Name1, Name3)),
     ACom4 = <<1, $b, 3, $C, $O, $m, 0 >>,
-    Name4 = from_wire_discard_left(ACom4),
+    {Name4, _} = from_wire(ACom4, 0),
     ?assertNot(is_equal(Name1, Name4)).
 
 parent_test() ->
     ACom= <<1, $A, 3, $c, $O, $m, 0 >>,
-    Name = from_wire_discard_left(ACom),
+    {Name, _} = from_wire(ACom, 0),
     ?assertEqual(to_wire(Name), <<1, $a, 3, $c, $o, $m, 0>>),
     Com = parent(Name),
     ?assertEqual(len(Com), 5),
@@ -225,7 +239,6 @@ substract_concat_test() ->
     CNName = from_string("CN"),
     ?assert(is_equal(concat(COMName, CNName), from_string("com.cn"))),
     ?assert(is_equal(substract(from_string("com.cn"), CNName), COMName)).
-
 
 -endif.
 
