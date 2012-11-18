@@ -38,14 +38,13 @@ label_to_string(#label{str = Str}) ->
     Str.
 
 label_from_wire(WholeMessage, CurrentPos) ->
-    DataToParse = r9_util:binary_rest(WholeMessage, CurrentPos),
-    <<Len:8/integer, LeftData/bits>> = DataToParse,
+    <<_ParsedData:CurrentPos/bytes, Len:8/integer, LeftData/bits>> = WholeMessage,
     if
         Len == 0 -> {?EMPTY_LABEL, CurrentPos + 1};
         (Len < ?MAX_LABEL_LEN) and (CurrentPos + Len < byte_size(WholeMessage))  -> 
                     << NameStr:Len/bytes, _/bits>> = LeftData,
                     {#label{len = Len + 1, str = string:to_lower(binary_to_list(NameStr))}, CurrentPos + Len + 1};
-        true -> <<2#11:2, LeftPos:6/integer, NextLeftPos:8/integer, _/bits>> = DataToParse,
+        true -> <<_ParsedData:CurrentPos/bytes, 2#11:2, LeftPos:6/integer, NextLeftPos:8/integer, _/bits>> = WholeMessage,
                 <<RealLabelPos:16>> = <<LeftPos:6, 0:2, NextLeftPos:8>>,
                 label_from_wire(WholeMessage, RealLabelPos)
     end.
@@ -78,19 +77,27 @@ labels_compare(Labels1, Labels2) ->
 
 
 %% labels API
-labels_from_wire_helper(WholeMessage, CurrentPos, Acc) ->
-    {Label, NextPos}  = label_from_wire(WholeMessage, CurrentPos),
+labels_from_wire_helper(WholeMessage, CurrentPos, PosBeforeJump, Acc) ->
+    {Label, NextLabelPos}  = label_from_wire(WholeMessage, CurrentPos),
     case Label#label.len of
-        1 -> {[Label | Acc], NextPos};
-        _ -> labels_from_wire_helper(WholeMessage, NextPos, [Label | Acc])
+        1 -> {[Label | Acc], if 
+                                PosBeforeJump =/= -1 -> PosBeforeJump + 2;
+                                true -> NextLabelPos
+                            end
+                
+                };
+        _ -> labels_from_wire_helper(WholeMessage, 
+                                     NextLabelPos, 
+                                     if 
+                                        (NextLabelPos < CurrentPos) and (PosBeforeJump == -1) -> CurrentPos;
+                                        true -> PosBeforeJump
+                                     end,  
+                                     [Label | Acc])
     end.
 
 labels_from_wire(WholeMessage, CurrentPos) ->
-    {Labels, NextPos} = labels_from_wire_helper(WholeMessage, CurrentPos, []),
-    if 
-        NextPos < CurrentPos -> {lists:reverse(Labels), CurrentPos + 2};
-        true -> {lists:reverse(Labels), NextPos}
-    end.
+    {Labels, NextPos} = labels_from_wire_helper(WholeMessage, CurrentPos, -1, []),
+    {lists:reverse(Labels), NextPos}.
 
 % [TODO] add len and label count check
 labels_from_string(Str) ->

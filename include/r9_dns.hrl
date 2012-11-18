@@ -68,6 +68,7 @@
 -define(TYPE_MINFO,14). % mailbox or mail list information
 -define(TYPE_MX,15).    % Mail eXchange
 -define(TYPE_TXT,16).   % Text Strings
+-define(TYPE_AAAA, 16#1c).   % IPV6
 
 
 -define(CLASS_IN, 1).   % Text Strings
