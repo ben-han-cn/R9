@@ -2,84 +2,75 @@
 -behaviour(gen_server).
 -import(r9_echo).
 
--export([start_link/1, run/1, stop/0]).
+-export([start_link/1, 
+         set_next_recursor/1,
+         stop/0]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
 -record(state, {
-            socket_,
-            is_running_,
-            child_count_ = 0,
-            children_ = []  %lists store all the children's pid
+            next_recursor,
+            ip,
+            port,
+            socket
         }).
+
 -define(SERVER, ?MODULE).
+-define(INVALID_SOCKET, 1).
 
-start_link(ChildCount) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [ChildCount], []).
+start_link(Port) ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [Port], []).
 
-run(Port) ->
-    gen_server:call(?SERVER, {run, Port}).
+set_next_recursor(NextRecursor) ->
+    gen_server:cast(?SERVER, {set_next_recursor, NextRecursor}).
 
 stop() ->
     gen_server:call(?SERVER, stop).
 
 
-init([ChildCount]) ->
-    process_flag(trap_exit, true),
-    {ok, #state{is_running_ = false, child_count_ = ChildCount}}.
-
-handle_call({run, _Port}, _From, State) when State#state.is_running_ ->
-        io:format("server already run"),
-        {reply, ok, State};
-handle_call({run, Port}, _From, State) ->
-        case gen_udp:open(Port, [binary]) of
+init([Port]) ->
+    case gen_udp:open(Port, [binary]) of
             {ok, Socket} ->
                 io:format("server start to run ~n"),
-                Children = lists:foldl(fun (_Index, ChildrenTmp) ->
-                                            {ok, Child} = r9_echo:start_link(),
-                                            [Child | ChildrenTmp]
-                                       end,
-                                       [],
-                                       lists:seq(1, State#state.child_count_)),
-                {reply, ok, State#state{socket_ = Socket, is_running_ = true, children_ = Children}};
-            {error, _Reason} ->
-                {reply, error, State}
-        end;
+                {ok, #state{socket = Socket}};
+            {error, Reason} ->
+                {stop, Reason}
+    end.
 
 handle_call(stop, _From, State) ->
-    lists:foreach(fun (Child) ->
-                    r9_echo:stop(Child)
-                  end,
-                  State#state.children_),
-    gen_udp:close(State#state.socket_),
-    {stop, normal, ok, State};
+    gen_udp:close(State#state.socket),
+    {stop, normal, ok, #state{socket = -1}};
 
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
+handle_cast({set_next_recursor, NextRecursor}, State) ->
+    {noreply, State#state{next_recursor = NextRecursor}};
+
+handle_cast({handle_response, IP, Port, Response},  #state{socket = Socket} = State) ->
+    case gen_udp:send(Socket, IP, Port, Response) of
+        ok -> {noreply, State};
+        {error, Reason} -> io:format("send to end user failed ~p ~n", [Reason]),
+                           {stop, Reason, State}
+    end;
+
 handle_cast(_Msg, State) ->
   {noreply, State}.
 
-handle_info({udp, Socket, IP, Port, Packet}, State) ->
-    [ChildToQuery | RestChild] = State#state.children_,
-    r9_echo:handle_query(ChildToQuery,
-                          Socket,
-                          IP,
-                          Port,
-                          Packet),
-                      {noreply, State#state{children_ = lists:append(RestChild, [ChildToQuery])}};
-handle_info({'EXIT', Pid, _Reason}, State) ->
-    ActiveChildren = State#state.children_,
-    case lists:member(Pid, ActiveChildren) of 
-        true -> 
-            io:format("process [~p] dead restart new process ~n", [Pid]),
-            {ok, NewChild} = r9_echo:start_link(),
-            {noreply, State#state{children_ = [NewChild | lists:delete(Pid, ActiveChildren)]}};
-        _ ->
-            io:format("unknown process dead [~p] ~n", [Pid]),
-            {noreply, State}
+handle_info({udp, _Socket, IP, Port, Packet}, #state{next_recursor = NextRecursor} = State) ->
+    io:format("<< next recursor for server is ~p ~n", [NextRecursor]),
+    NextRecursor ! {handle_query, Packet},
+    {noreply, State#state{ip = IP, port = Port}};
+
+handle_info({handle_response, Packet}, #state{socket = Socket, ip = IP, port = Port} = State) ->
+    io:format("<< get response ~p , then send to user ~n", [Packet]),
+    case gen_udp:send(Socket, IP, Port, Packet) of
+        ok -> {noreply, State}; 
+        {error, Reason} -> io:format("send query failed: ~p ~n", [Reason]),
+            {stop, Reason, State}
     end.
+
 
 terminate(_Reason, _State) ->
   ok.
