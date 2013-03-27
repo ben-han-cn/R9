@@ -2,8 +2,11 @@
 
 -export([ipv4_from_wire/1,
          ipv6_from_wire/1,
+         ipv4_to_wire/1,
+         ipv6_to_wire/1,
          ipv4_from_string/1,
-         ipv4_to_string/1
+         ipv4_to_string/1,
+         ipv6_to_string/1
         ]).
 
 -define(TEST, true).
@@ -12,9 +15,15 @@ ipv4_from_wire(WireData) ->
     <<IP:32/big>> = WireData,
     IP.
 
+ipv4_to_wire(IP) ->
+    <<IP:32/big>>.
+
 ipv6_from_wire(WireData) ->
     <<IP:128/big>> = WireData,
     IP.
+
+ipv6_to_wire(IP) ->
+    <<IP:128/big>>.
 
 ipv4_from_string(Str) ->
     [Label1, Label2, Label3, Label4] = lists:map(fun(Label) -> 
@@ -29,6 +38,9 @@ ipv4_to_string(IP) ->
     <<Label1:8, Label2:8, Label3:8, Label4:8>> = <<IP:32/big>>,
     string:join(lists:map(fun(Label)-> integer_to_list(Label) end, [Label1, Label2, Label3, Label4]), ".").
 
+ipv6_to_string(IP) ->
+    <<Label1:16, Label2:16, Label3:16, Label4:16, Label5:16, Label6:16, Label7:16, Label8:16>> = <<IP:128/big>>,
+    string:join(lists:map(fun(Label)-> integer_to_list(Label) end, [Label1, Label2, Label3, Label4, Label5, Label6, Label7, Label8 ]), ":").
 
 %% Tests
 -ifdef(TEST).

@@ -1,6 +1,7 @@
 -module(r9_message_question).
 
 -export([from_wire/2,
+        to_wire/1,
         name/1,
         type/1,
         class/1
@@ -22,6 +23,13 @@ from_wire(WireData, CurrentPos) ->
     {#question{name = Name, 
               type = Type,
               class = CLASS}, NextPos + 4}.
+
+to_wire(Question) ->
+    WireNameBinary = r9_wire_name:to_wire(name(Question)),
+    Type = type(Question),
+    Class = class(Question),
+    <<WireNameBinary/binary, Type:16/big, Class:16/big>>.
+
 
 
 

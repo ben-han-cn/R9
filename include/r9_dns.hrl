@@ -31,6 +31,24 @@
                          additional_sec_count
                          }).
 
+-record(message, { header,
+                   question,
+                   answer_section,
+                   authority_section,
+                   additional_section}).
+
+-record(rr, {name,   
+        type,
+        class,
+        ttl = 0,
+        rdata}). 
+
+-record(rrset, {name,   
+        type,
+        class,
+        ttl = 0,
+        rdatas}). 
+
 -define(RCODE_STR, ["NOERROR",
                     "FORMERR",
                     "SERVFAIL",
@@ -69,6 +87,7 @@
 -define(TYPE_MX,15).    % Mail eXchange
 -define(TYPE_TXT,16).   % Text Strings
 -define(TYPE_AAAA, 16#1c).   % IPV6
+-define(TYPE_OPT, 16#29).   % OPT
 
 
 -define(CLASS_IN, 1).   % Text Strings
@@ -94,4 +113,17 @@
               retry,
               expire,
               minimum}).
+-record(opt, {code, len, data}).
 
+
+% event
+-record(dns_event, {origin_request,
+                    current_request,
+                    response,
+                    ip,
+                    port}).
+
+-record(delegation_point, {name,
+                           v4_ips,
+                           v6_ips}).
+                           

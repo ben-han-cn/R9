@@ -108,6 +108,8 @@ labels_from_string(Str) ->
     end.
 
 labels_is_equal([], []) -> true;
+labels_is_equal(_, []) -> false;
+labels_is_equal([], _) -> false;
 labels_is_equal(Labels1, Labels2) ->
     {[Label1 | Labels1Left], [Label2 | Labels2Left]} = {Labels1, Labels2},
     label_is_equal(Label1, Label2) and labels_is_equal(Labels1Left, Labels2Left).

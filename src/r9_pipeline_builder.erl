@@ -19,13 +19,10 @@ stop(Pid) ->
 
 init([Port]) ->
     {ok, Server} = r9_server:start_link(Port),
-    io:format("<<<<<< after server init ~n"),
     {ok, Iterator} = r9_iterator:start_link(),
-    io:format("<<<<<< after iterator init ~n"),
     r9_server:set_next_recursor(Iterator),
-    io:format("<<<<<< after init server ~n"),
     r9_iterator:set_prev_recursor(Server),
-    io:format("<<<<<< after init iterator ~n"),
+    io:format("----> server start at ~p ~n", [Port]),
     {ok, #state{recursors = [Server, Iterator]}}.
 
 
@@ -46,4 +43,3 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
-

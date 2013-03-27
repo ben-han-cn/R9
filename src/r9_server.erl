@@ -59,12 +59,10 @@ handle_cast(_Msg, State) ->
   {noreply, State}.
 
 handle_info({udp, _Socket, IP, Port, Packet}, #state{next_recursor = NextRecursor} = State) ->
-    io:format("<< next recursor for server is ~p ~n", [NextRecursor]),
     NextRecursor ! {handle_query, Packet},
     {noreply, State#state{ip = IP, port = Port}};
 
 handle_info({handle_response, Packet}, #state{socket = Socket, ip = IP, port = Port} = State) ->
-    io:format("<< get response ~p , then send to user ~n", [Packet]),
     case gen_udp:send(Socket, IP, Port, Packet) of
         ok -> {noreply, State}; 
         {error, Reason} -> io:format("send query failed: ~p ~n", [Reason]),

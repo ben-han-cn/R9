@@ -1,24 +1,24 @@
 -module(r9_message).
 
--export([from_wire/2,
+-export([from_wire/1,
+         from_wire/2,
+         to_wire/1,
          header/1,
          question/1,
          answer_section/1,
          authority_section/1,
          additional_section/1,
-         sections/1
+         sections/1,
+         set_flag/3,
+         set_id/2
         ]).
 
-
--record(message, { header,
-                   question,
-                   answer_section,
-                   authority_section,
-                   additional_section}).
 
 -include("r9_dns.hrl").
 
 
+from_wire(WireData) ->
+    from_wire(WireData, 0).
 from_wire(WireData, CurrentPos) ->
     {Header, NextPos} = r9_message_header:from_wire(WireData, CurrentPos),
     {Question, NNextPos} = r9_message_question:from_wire(WireData, NextPos),
@@ -31,6 +31,14 @@ from_wire(WireData, CurrentPos) ->
              authority_section = AuthoritySection,
              additional_section = AdditionalSection}, NNNNNextPos}.
 
+to_wire(Message) ->
+    list_to_binary([r9_message_header:to_wire(header(Message)),
+                    r9_message_question:to_wire(question(Message)),
+                    r9_message_section:to_wire(answer_section(Message)),
+                    r9_message_section:to_wire(authority_section(Message)),
+                    r9_message_section:to_wire(additional_section(Message))]).
+
+
 header(Message) -> Message#message.header.
 question(Message) -> Message#message.question.
 answer_section(Message) -> Message#message.answer_section.
@@ -39,6 +47,11 @@ additional_section(Message) -> Message#message.additional_section.
 sections(Message) -> [answer_section(Message), authority_section(Message), additional_section(Message)].
 
 
+set_flag(#message{header = Header} = Message, Flag, Value) ->
+    Message#message{header = r9_message_header:set_flag(Header, Flag, Value)}.
+
+set_id(#message{header = Header} = Message, ID) ->
+    Message#message{header = r9_message_header:set_id(Header, ID)}.
 
 %%
 %% Tests
@@ -48,6 +61,7 @@ sections(Message) -> [answer_section(Message), authority_section(Message), addit
 message_from_wire_test()->
     WireData = <<16#2c,16#4e,16#80,16#80,16#0,16#1,16#0,16#1,16#0,16#0,16#0,16#0,16#2,16#63,16#6e,16#0,16#0,16#6,16#0,16#1,16#c0,16#c,16#0,16#6,16#0,16#1,16#0,16#0,16#2b,16#2e,16#0,16#29,16#1,16#61,16#3,16#64,16#6e,16#73,16#c0,16#c,16#4,16#72,16#6f,16#6f,16#74,16#5,16#63,16#6e,16#6e,16#69,16#63,16#c0,16#c,16#78,16#6,16#99,16#a,16#0,16#0,16#1c,16#20,16#0,16#0,16#e,16#10,16#0,16#24,16#ea,16#0,16#0,16#0,16#54,16#60>>,
     {Message, NextPosToParse} = from_wire(WireData, 0),
+    ?assertEqual(to_wire(Message), WireData),
     Header = header(Message),
     ?assertEqual(r9_message_header:id(Header), 11342),
     ?assertEqual(r9_message_header:question_section_count(Header), 1),

@@ -1,14 +1,18 @@
 -module(r9_message_header).
 
 -export([from_wire/2,
+        to_wire/1,
         id/1,
         print/1,
-        set_qr/1,
+        set_flag/3,
+        set_id/2,
         qr/1,
         opcode/1,
         tc/1,
         rd/1,
         ra/1,
+        aa/1,
+        rcode/1,
         question_section_count/1,
         answer_section_count/1,
         authority_section_count/1,
@@ -20,9 +24,11 @@
 id(Header) -> Header#message_header.id.
 qr(Header) -> Header#message_header.qr.
 opcode(Header) -> Header#message_header.opcode.
+aa(Header) -> Header#message_header.aa.
 tc(Header) -> Header#message_header.tc.
 rd(Header) -> Header#message_header.rd.
 ra(Header) -> Header#message_header.ra.
+rcode(Header) -> Header#message_header.rcode.
 question_section_count(Header) -> Header#message_header.question_sec_count.
 answer_section_count(Header) -> Header#message_header.answer_sec_count.
 authority_section_count(Header) -> Header#message_header.authority_sec_count.
@@ -52,10 +58,40 @@ from_wire(WireData, CurrentPos) ->
                     authority_sec_count = AuthorityCount, 
                     additional_sec_count = AdditionalCount}, CurrentPos + 12}.
 
+to_wire(Header) ->
+    ID = id(Header),
+    Qr = qr(Header),
+    Opcode = opcode(Header),
+    AA = aa(Header),
+    TC = tc(Header),
+    RD = rd(Header),
+    RA = ra(Header),
+    RCode = rcode(Header),
+    <<Flags:16>> = <<Qr:1, Opcode:4, AA:1, TC:1, RD:1, RA:1, 0:3, RCode:4>>,
 
-set_qr(WireData) when is_bitstring(WireData) and (byte_size(WireData) >= 12) ->
-    <<ID:16/bits, Flags:15/bits, _Qr:1, Others/bits>> = WireData,
-    <<ID:16/bits, 1:1/integer, Flags:15/bits, Others/bits>>.
+    QuestionCount = question_section_count(Header),
+    AnswerCount = answer_section_count(Header),
+    AuthorityCount = authority_section_count(Header),
+    AdditionalCount = additional_section_count(Header),
+    << ID:16/big, 
+    Flags:16/big, 
+    QuestionCount:16/integer-big, 
+    AnswerCount:16/integer-big, 
+    AuthorityCount:16/integer-big, 
+    AdditionalCount:16/integer-big>>.
+      
+set_flag(MessageHeader, qr, Value) ->
+    MessageHeader#message_header{qr = Value};
+set_flag(MessageHeader, ra, Value) ->
+    MessageHeader#message_header{ra = Value};
+set_flag(MessageHeader, rd, Value) ->
+    MessageHeader#message_header{rd = Value}.
+
+
+set_id(MessageHeader, ID) ->
+    MessageHeader#message_header{id = ID}.
+    
+
 
 
 %% bind format
