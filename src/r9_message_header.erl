@@ -2,6 +2,7 @@
 
 -export([from_wire/2,
         to_wire/1,
+        make_query_header/0,
         id/1,
         print/1,
         set_flag/3,
@@ -20,6 +21,24 @@
     ]).
 
 -include("r9_dns.hrl").
+
+make_query_header() ->
+    #message_header{id = random:uniform(65535), 
+            qr = 0, 
+            opcode = ?OPCODE_QUERY, 
+            aa = 0, 
+            tc = 0, 
+            rd = 1, 
+            ra = 0, 
+            rcode = ?RCODE_NOERROR, 
+            question_sec_count = 1, 
+            answer_sec_count = 0, 
+            authority_sec_count = 0, 
+            additional_sec_count = 0}.
+
+
+
+
 
 id(Header) -> Header#message_header.id.
 qr(Header) -> Header#message_header.qr.

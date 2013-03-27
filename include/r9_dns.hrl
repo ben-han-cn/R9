@@ -61,6 +61,17 @@
                     "NOTAUTH",
                     "NOTZONE"]).
 
+-define(RCODE_NOERROR, 0).
+-define(RCODE_FORMERR, 1).
+-define(RCODE_SERVFAIL, 2).
+-define(RCODE_NXDOMAIN, 3).
+-define(RCODE_NOTIMP, 4).
+-define(RCODE_REFUSED, 5).
+-define(RCODE_YXDOMAIN, 6).
+-define(RCODE_YXRRSET, 7).
+-define(RCODE_NXRRSET, 8).
+-define(RCODE_NOTAUTH, 9).
+-define(RCODE_NOTZONE, 10).
 
 -define(OPCODE_STR,[ "QUERY",
                      "INVERSE",
@@ -68,6 +79,16 @@
                      "UNKNOWN",
                      "NOTIFY",
                      "UPDATE"]).
+
+-define(OPCODE_QUERY, 0).
+-define(OPCODE_INVERSE, 1).
+-define(OPCODE_STATUS, 2).
+-define(OPCODE_UNKNOWN, 3).
+-define(OPCODE_NOTIFY, 4).
+-define(OPCODE_UPDATE,  5).
+
+
+
 
 
 -define(TYPE_A,1).      % host address

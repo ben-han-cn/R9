@@ -4,7 +4,8 @@
         to_wire/1,
         name/1,
         type/1,
-        class/1
+        class/1,
+        id/1
         ]).
 
 -include("r9_dns.hrl").
@@ -30,6 +31,10 @@ to_wire(Question) ->
     Class = class(Question),
     <<WireNameBinary/binary, Type:16/big, Class:16/big>>.
 
+id(Question) ->
+    lists:concat([r9_wire_name:to_string(name(Question)), 
+                  "/", 
+                  r9_rr:rtype_to_string(type(Question))]).
 
 
 

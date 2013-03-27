@@ -18,12 +18,13 @@ stop(Pid) ->
 
 
 init([Port]) ->
-    {ok, Server} = r9_server:start_link(Port),
     {ok, Iterator} = r9_iterator:start_link(),
-    r9_server:set_next_recursor(Iterator),
-    r9_iterator:set_prev_recursor(Server),
+    {ok, Acceptor} = r9_acceptor:start_link(),
+    r9_acceptor:set_next_recursor(Iterator),
+    r9_iterator:set_prev_recursor(Acceptor),
+    {ok, _Server} = r9_server:start_link(Port, Acceptor),
     io:format("----> server start at ~p ~n", [Port]),
-    {ok, #state{recursors = [Server, Iterator]}}.
+    {ok, #state{recursors = [Acceptor, Iterator]}}.
 
 
 handle_call(stop, _From, State) ->

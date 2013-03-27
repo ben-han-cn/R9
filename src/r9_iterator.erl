@@ -7,10 +7,6 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
         terminate/2, code_change/3]).
 
--record(out_query, {
-        client_query
-    }). 
-
 -record(state, {
         cache,
         prev_recursor,
@@ -18,7 +14,9 @@
         out_queries,
         socket
     }).
+
 -define(ITERATOR, ?MODULE).
+-include("r9_resolver.hrl").
 
 start_link() ->
     gen_server:start_link({local, ?ITERATOR}, ?ITERATOR, [], []).
@@ -56,22 +54,21 @@ handle_cast(_Msg, State) ->
 handle_info({udp, _Socket, _IP, _Port, Packet}, #state{prev_recursor = PrevRecursor} = State) ->
     {Message, _} = r9_message:from_wire(Packet, 0),
     r9_cache:put_message(Message),
-    PrevRecursor ! {handle_response, Packet},
+    PrevRecursor ! {handle_response, #response{question = r9_message:question(Message), 
+                                               reply_message = Message}},
     {noreply, State};
 
-handle_info({handle_query, Query}, #state{socket = Socket, out_queries = OutQueries} = State) ->
-    NewState = State#state{out_queries = [#out_query{client_query = Query} | OutQueries]},
-    {QueryMessage, _} = r9_message:from_wire(Query),
-    Question = r9_message:question(QueryMessage),
+handle_info({handle_query, #request{question = Question, client = Client}}, #state{socket = Socket, out_queries = OutQueries} = State) ->
+    NewState = State#state{out_queries = [Client | OutQueries]},
     case r9_cache:get_message(r9_message_question:name(Question), 
                               r9_message_question:type(Question)) of
         {ok, CachedMessage} ->
-            QueryID = r9_message_header:id(r9_message:header(QueryMessage)),
-            Response = r9_message:to_wire(r9_message:set_id(CachedMessage, QueryID)),
-            State#state.prev_recursor ! {handle_response, Response},
+            State#state.prev_recursor ! {handle_response, #response{question = Question, 
+                                                                    reply_message = CachedMessage}},
             {noreply, NewState}; 
         {not_found} ->
-            case gen_udp:send(Socket, "8.8.8.8", 53, Query) of
+            DelegateQuery = r9_message:to_wire(r9_message:make_query(Question)),
+            case gen_udp:send(Socket, "8.8.8.8", 53, DelegateQuery) of
                 ok -> {noreply, NewState}; 
                 {error, Reason} -> io:format("send query failed: ~p ~n", [Reason]),
                     {stop, Reason, State}

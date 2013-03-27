@@ -3,6 +3,7 @@
 -export([from_wire/1,
          from_wire/2,
          to_wire/1,
+         make_query/1,
          header/1,
          question/1,
          answer_section/1,
@@ -38,6 +39,13 @@ to_wire(Message) ->
                     r9_message_section:to_wire(authority_section(Message)),
                     r9_message_section:to_wire(additional_section(Message))]).
 
+
+make_query(Question) ->
+    #message{header = r9_message_header:make_query_header(),
+             question = Question,
+             answer_section = r9_message_section:from_rrsets([]),
+             authority_section = r9_message_section:from_rrsets([]),
+             additional_section = r9_message_section:from_rrsets([])}.
 
 header(Message) -> Message#message.header.
 question(Message) -> Message#message.question.
