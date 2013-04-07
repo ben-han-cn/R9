@@ -135,6 +135,7 @@
               expire,
               minimum}).
 -record(opt, {code, len, data}).
+-record(txt, {len, text}).
 
 
 % event

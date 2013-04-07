@@ -73,7 +73,8 @@ rtype_to_string(?TYPE_CNAME) -> "CNAME";
 rtype_to_string(?TYPE_SOA) -> "SOA";
 rtype_to_string(?TYPE_PTR) -> "PTR";
 rtype_to_string(?TYPE_AAAA) -> "AAAA";
-rtype_to_string(_) ->  throw("unknown type").
+rtype_to_string(?TYPE_OPT) -> "OPT";
+rtype_to_string(_) ->  "unknown type".
 
 to_string(RR) ->
     r9_wire_name:to_string(name(RR)) ++ " " ++ rtype_to_string(type(RR)) ++ " " ++ integer_to_list(ttl(RR)) ++ " " ++ r9_rdata_struct:to_string(rdata(RR)).

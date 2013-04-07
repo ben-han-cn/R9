@@ -82,13 +82,19 @@ from_wire(?TYPE_AAAA, WholeMessage, StartPos) ->
 %+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 %/                          OPTION-DATA                          /
 %+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-from_wire(?TYPE_OPT, WholeMessage, StartPos) ->
-    <<_ParsedData:StartPos/bytes, Code:16/big, Len:16/big, Data:Len/bytes>> = WholeMessage,
-    #opt{code = Code, data = Data};
+from_wire(?TYPE_OPT, _WholeMessage, _StartPos) ->
+    %<<_ParsedData:StartPos/bytes, Code:16/big, Len:16/big, Data/bytes>> = WholeMessage,
+    #opt{code = 10, data = ""};
+
+
+from_wire(?TYPE_TXT, WholeMessage, StartPos) ->
+    RdlenPos = StartPos - 2,
+    <<_ParsedData:RdlenPos/bytes, Rdlen:16/big, Txt:Rdlen/bytes, _/bits>> = WholeMessage,
+    #txt{len = Rdlen, text = Txt};
 
 from_wire(UnknownType, _, _) ->
-    io:format("unknown from wire ~p ~n", [UnknownType]),
-    throw("unknow type").
+    io:format("unknownn from wire ~p ~n", [UnknownType]),
+    throw("unknown type").
 
 
 % A
@@ -163,12 +169,15 @@ to_wire(#aaaa{ip = IP}) ->
 %+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 %/                          OPTION-DATA                          /
 %+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-to_wire(#opt{code = Code, len = Len, data = Data}) ->
-    {2 + 2 + Len, <<Code:16/big, Len:16/big, Data:Len/bytes>>};
+to_wire(#opt{code = _Code, len = _Len, data = _Data}) ->
+    {0, <<>>};
+
+to_wire(#txt{len = Len, text = Text}) ->
+    {Len, <<Text/binary>>};
 
 to_wire(UnknownType) ->
-    io:format("unknown from wire ~p ~n", [UnknownType]),
-    throw("unknow type").
+    io:format("unknownn from wire ~p ~n", [UnknownType]),
+    throw("unknown type").
 
 to_string(#a{ip = IP}) ->
     r9_util:ipv4_to_string(IP);
@@ -201,6 +210,6 @@ to_string(#opt{code = Code}) ->
     "[opt]" ++ integer_to_list(Code);
 
 to_string(UnknownType) ->
-    io:format("unknown from to string ~p ~n", [UnknownType]),
-    throw("unknow type").
+    io:format("unknownn from to string ~p ~n", [UnknownType]),
+    throw("unknown type").
 

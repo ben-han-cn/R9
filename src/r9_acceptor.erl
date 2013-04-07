@@ -61,8 +61,9 @@ handle_info({accept_request, Socket, Client, Packet},
                        question = Question,
                        client = Client,
                        socket = Socket},
-    ets:insert(ConcurrentQueryTable, #query_entry{id = r9_message_question:id(Question), request = Request}),
-    NextRecursor ! {handle_query, Request},
+    MessageID = r9_message_question:id(Question),
+    ets:member(ConcurrentQueryTable, MessageID) orelse (NextRecursor ! {handle_query, Request}),
+    ets:insert(ConcurrentQueryTable, #query_entry{id = MessageID, request = Request}),
     {noreply, State};
 
 handle_info({handle_response, Response},  #state{concurrent_queries = ConcurrentQueryTable} = State) ->
@@ -84,12 +85,13 @@ answer_clients_with_same_question(ConcurrentQueryTable, #response{question = Que
     case ets:lookup(ConcurrentQueryTable, QuestionID) of
         [] -> io:format("~~error unknown asker for response ~p", [QuestionID]);
         Askers ->
+            <<_:16, RawDataExceptID/binary>> = r9_message:to_wire(Message),
             lists:foreach(fun(#query_entry{request = Request}) ->
                             #request{id = ID, client = Client, socket = Socket} = Request,
                             gen_udp:send(Socket, 
                                          Client#host.ip, 
                                          Client#host.port, 
-                                         r9_message:to_wire(r9_message:set_id(Message, ID)))
+                                         list_to_binary([<<ID:16/big>>, RawDataExceptID])) 
                          end, Askers)
     end,
     ets:delete(ConcurrentQueryTable, QuestionID).

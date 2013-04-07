@@ -21,13 +21,16 @@
             question,
             answer_rrset_keys,
             authority_rrset_keys,
-            additional_rrset_keys}).
+            additional_rrset_keys,
+            expiration}).
 
 -record(rrset_entry, {
             rrset_id,
-            rrset}).
+            rrset,
+            expiration}).
 
 -define(SERVER, ?MODULE).
+-define(MAX_TTL, 864000).
 -include("r9_dns.hrl").
 
 start_link() ->
@@ -70,15 +73,16 @@ handle_call(_Request, _From, State) ->
 handle_cast({put_message, Message}, #state{message_table = MessageTable,
                                            rrset_table = RRsetTable} = State) ->
 
-    AnswerSectionRRsetKeys = store_section(RRsetTable, r9_message:answer_section(Message)),
-    AdditionalRRsetKeys = store_section(RRsetTable, r9_message:authority_section(Message)),
-    AuthorityRRsetKeys = store_section(RRsetTable, r9_message:additional_section(Message)),
+    {AnswerMinTTl, AnswerSectionRRsetKeys} = store_section(RRsetTable, r9_message:answer_section(Message)),
+    {AdditionalMinTTl, AdditionalRRsetKeys} = store_section(RRsetTable, r9_message:authority_section(Message)),
+    {AuthorityMinTTl, AuthorityRRsetKeys} = store_section(RRsetTable, r9_message:additional_section(Message)),
     ets:insert(MessageTable, #message_entry{message_id = message_id(Message),
                                             header = r9_message:header(Message),
                                             question = r9_message:question(Message),
                                             answer_rrset_keys = AnswerSectionRRsetKeys,
                                             authority_rrset_keys = AuthorityRRsetKeys,
-                                            additional_rrset_keys = AdditionalRRsetKeys}),
+                                            additional_rrset_keys = AdditionalRRsetKeys,
+                                            expiration = local_now() + lists:min([AnswerMinTTl, AdditionalMinTTl, AuthorityMinTTl])}),
     {noreply, State};
 
 handle_cast(_Msg, State) ->
@@ -107,12 +111,17 @@ rrset_id(RRset) ->
     generate_id(r9_rrset:name(RRset), r9_rrset:type(RRset)).
 
 store_section(RRsetTable, Section) ->
-    lists:foldl(fun(RRset, IDs) ->
+    lists:foldl(fun(RRset, {MinTTl, IDs}) ->
                     RRsetID = rrset_id(RRset),
                     ets:insert(RRsetTable, #rrset_entry{rrset_id = RRsetID,
-                                                        rrset = RRset}),
-                    [RRsetID | IDs] 
-            end, [], r9_message_section:rrsets(Section)).
+                                                        rrset = RRset,
+                                                        expiration = r9_rrset:ttl(RRset) + local_now()}),
+                    {case MinTTl > r9_rrset:ttl(RRset) of
+                            true -> r9_rrset:ttl(RRset);
+                            false -> MinTTl
+                    end,
+                    [RRsetID | IDs]}
+            end, {?MAX_TTL, []}, r9_message_section:rrsets(Section)).
 
 find_rrset(RRsetTable, Name, Type) ->
     find_rrset(RRsetTable, generate_id(Name, Type)).
@@ -120,7 +129,13 @@ find_rrset(RRsetTable, Name, Type) ->
 find_rrset(RRsetTable, RRsetID) ->
     case ets:lookup(RRsetTable, RRsetID) of
         [] -> {not_found};
-        [#rrset_entry{rrset = RRset}] -> {ok, RRset}
+        [#rrset_entry{rrset = RRset, expiration = ExpireTime}] -> 
+            case local_now() > ExpireTime of 
+                true -> 
+                    ets:delete(RRsetTable, RRsetID),
+                    {not_found};
+                false -> {ok, RRset#rrset{ttl = ExpireTime - local_now()}}
+            end
     end.
 
 find_section(RRsetTable, SectionRRsetIDs) ->
@@ -130,20 +145,31 @@ find_section(RRsetTable, SectionRRsetIDs) ->
             end, [], SectionRRsetIDs).
 
 find_message(MessageTable, RRsetTable, Name, Type) ->
-    case ets:lookup(MessageTable, generate_id(Name, Type)) of
+    MessageID = generate_id(Name, Type),
+    case ets:lookup(MessageTable, MessageID) of
         [] -> 
             {not_found};
         [#message_entry{header = Header,
                         question = Question,
                         answer_rrset_keys = AnswerRRsetKeys,
                         authority_rrset_keys = AuthorityRRsetKeys,
-                        additional_rrset_keys = AdditionalRRsetKeys}] -> 
+                        additional_rrset_keys = AdditionalRRsetKeys,
+                        expiration = ExpireTime}] -> 
+           case local_now() > ExpireTime of 
+                true -> 
+                    ets:delete(MessageTable, MessageID),
+                    {not_found};
+                false -> 
                     AnswerSection = r9_message_section:from_rrsets(find_section(RRsetTable, AnswerRRsetKeys)),
                     AuthoritySection = r9_message_section:from_rrsets(find_section(RRsetTable, AuthorityRRsetKeys)),
                     AdditionalSection= r9_message_section:from_rrsets(find_section(RRsetTable, AdditionalRRsetKeys)),
-            {ok, #message{header = Header,
+                    {ok, #message{header = Header,
                           question = Question,
                           answer_section = AnswerSection,
                           authority_section = AuthoritySection,
                           additional_section = AdditionalSection}}
+          end
     end.
+
+local_now() ->
+    calendar:datetime_to_gregorian_seconds(calendar:local_time()).
