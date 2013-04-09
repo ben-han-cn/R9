@@ -71,7 +71,7 @@ handle_info({handle_query, #request{question = Question, client = Client}}, #sta
             case gen_udp:send(Socket, "8.8.8.8", 53, DelegateQuery) of
                 ok -> {noreply, NewState}; 
                 {error, Reason} -> io:format("send query failed: ~p ~n", [Reason]),
-                    {stop, Reason, State}
+                    {noreply, NewState}
             end
     end;
 
