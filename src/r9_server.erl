@@ -17,17 +17,22 @@
 
 -define(SERVER, ?MODULE).
 -define(INVALID_SOCKET, 1).
+-define(DEFAULT_LISTEN_PORT, 53).
 
 -include("r9_resolver.hrl"). 
 
-start_link(Port, Acceptor) ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [Port, Acceptor], []).
+start_link(Config, Acceptor) ->
+  gen_server:start_link({local, ?SERVER}, ?MODULE, [Config, Acceptor], []).
 
 stop() ->
     gen_server:call(?SERVER, stop).
 
 
-init([Port, Acceptor]) ->
+init([Config, Acceptor]) ->
+    Port = case r9_config:get(Config, "listen_port") of
+        {ok, PortStr} -> r9_util:string_to_integer(PortStr);
+        {not_found} -> ?DEFAULT_LISTEN_PORT
+    end,
     case gen_udp:open(Port, [binary]) of
             {ok, Socket} ->
                 io:format("server start to run ~n"),

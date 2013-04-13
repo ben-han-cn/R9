@@ -3,6 +3,7 @@
 -export([from_wire/2,
         to_wire/1,
         make_query_header/0,
+        make_response_header/1,
         id/1,
         print/1,
         set_flag/3,
@@ -23,21 +24,25 @@
 -include("r9_dns.hrl").
 
 make_query_header() ->
+    make_header(0, 0, ?RCODE_NOERROR, [0, 0, 0]).
+
+make_response_header(SectionRRsetCounts) ->
+    make_header(1, 1, ?RCODE_NOERROR, SectionRRsetCounts).
+
+make_header(Qr, AA, Rcode, SectionRRsetCounts) ->
+    [AnswerSecCount, AuthSecCount, AdditionalSecCount] = SectionRRsetCounts,
     #message_header{id = random:uniform(65535), 
-            qr = 0, 
+            qr = Qr, 
             opcode = ?OPCODE_QUERY, 
-            aa = 0, 
+            aa = AA, 
             tc = 0, 
             rd = 1, 
-            ra = 0, 
-            rcode = ?RCODE_NOERROR, 
+            ra = 1, 
+            rcode = Rcode, 
             question_sec_count = 1, 
-            answer_sec_count = 0, 
-            authority_sec_count = 0, 
-            additional_sec_count = 0}.
-
-
-
+            answer_sec_count = AnswerSecCount, 
+            authority_sec_count = AuthSecCount, 
+            additional_sec_count = AdditionalSecCount}.
 
 
 id(Header) -> Header#message_header.id.

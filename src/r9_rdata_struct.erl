@@ -1,14 +1,12 @@
 -module(r9_rdata_struct).
 -export([from_wire/3,
         to_wire/1,
-        from_string/1,
+        from_string/2,
         to_string/1]).
 
 -include("r9_dns.hrl").
 
 %rdata API
-from_string(IP) ->
-    #a{ip = r9_util:ipv4_from_string(IP)}.
 
 % A
 from_wire(?TYPE_A, WholeMessage, StartPos) ->
@@ -212,4 +210,35 @@ to_string(#opt{code = Code}) ->
 to_string(UnknownType) ->
     io:format("unknownn from to string ~p ~n", [UnknownType]),
     throw("unknown type").
+
+from_string(?TYPE_A, IP) ->
+    #a{ip = r9_util:ipv4_from_string(IP)};
+
+from_string(?TYPE_AAAA, IP) ->
+    #aaaa{ip = r9_util:ipv6_from_string(IP)};
+
+from_string(?TYPE_NS, DomainName) ->
+    #domain{domain = r9_wire_name:from_string(DomainName)};
+
+from_string(?TYPE_MX, Data) ->
+    [Preference, Exchange] = string:token(Data, " "),
+    #mx{preference= r9_util:string_to_integer(Preference), exchange = r9_wire_name:from_string(Exchange)};
+
+from_string(?TYPE_SOA, Data) ->
+    [MName, RName, Serial, Refresh, Retry, Expire, Minimum] = string:token(Data, " "),
+    #soa{mname = r9_wire_name:from_string(MName), 
+        rname = r9_wire_name:from_string(RName), 
+        serial = r9_util:string_to_integer(Serial), 
+        refresh = r9_util:string_to_integer(Refresh),
+        retry = r9_util:string_to_integer(Retry),
+        expire = r9_util:string_to_integer(Expire),
+        minimum = r9_util:string_to_integer(Minimum)};
+
+from_string(?TYPE_OPT, Code) ->
+    #opt{code = r9_util:string_to_integer(Code)};
+
+from_string(UnknownType, _Data) ->
+    io:format("unknownn from to string ~p ~n", [UnknownType]),
+    throw("unknown type").
+
 

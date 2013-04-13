@@ -4,6 +4,7 @@
          from_wire/2,
          to_wire/1,
          make_query/1,
+         make_response/4,
          header/1,
          question/1,
          answer_section/1,
@@ -46,6 +47,15 @@ make_query(Question) ->
              answer_section = r9_message_section:from_rrsets([]),
              authority_section = r9_message_section:from_rrsets([]),
              additional_section = r9_message_section:from_rrsets([])}.
+
+make_response(Question, AnswerRRsets, AdditionalRRsets, AuthorityRRsets) ->
+    #message{header = r9_message_header:make_response_header(lists:map(fun(RRsets) -> length(RRsets) end, 
+                                                               [AnswerRRsets, AdditionalRRsets, AuthorityRRsets])),
+             question = Question,
+             answer_section = r9_message_section:from_rrsets(AnswerRRsets),
+             authority_section = r9_message_section:from_rrsets(AuthorityRRsets),
+             additional_section = r9_message_section:from_rrsets(AdditionalRRsets)}.
+
 
 header(Message) -> Message#message.header.
 question(Message) -> Message#message.question.

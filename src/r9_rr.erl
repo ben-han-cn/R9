@@ -9,6 +9,9 @@
         class/1,
         ttl/1,
         rtype_to_string/1,
+        rtype_from_string/1,
+        class_to_string/1,
+        class_from_string/1,
         rdata/1]).
 
 -include("r9_dns.hrl").
@@ -21,13 +24,13 @@ rdata(RR) -> RR#rr.rdata.
 
 % example.com 2915 IN  A 1.1.1.1
 from_string(Str) -> 
-    [NameStr, TTL, CLASS, Type|Rdata] = string:tokens(Str, "."),
-    UnifyType = string:to_upper(Type),
-    {_Rdlen, RdataStruct} = r9_rdata_struct:from_string(UnifyType, Rdata),
+    [NameStr, TTL, ClassStr, TypeStr | Rdata] = string:tokens(Str, " "),
+    Type = rtype_from_string(string:to_upper(TypeStr)),
+    RdataStruct = r9_rdata_struct:from_string(Type, lists:concat(Rdata)),
     #rr{name = r9_wire_name:from_string(NameStr), 
-        type = UnifyType,
-        class = string:to_upper(CLASS),
-        ttl = string:to_integer(TTL),
+        type = Type,
+        class = class_from_string(string:to_upper(ClassStr)),
+        ttl = r9_util:string_to_integer(TTL),
         rdata = RdataStruct}.
 
 
@@ -53,10 +56,10 @@ from_wire(WholeMessage, CurrentPos) ->
     <<_ParsedData:NextPos/bytes, Type:16/big, CLASS:16/big, TTL:32/big, Rdlen:16/big, _/bits>> = WholeMessage,
     RdataStartPos = NextPos + 2 + 2 + 4 + 2,
     {#rr{name = Name, 
-            type = Type,
-            class = CLASS,
-            ttl = TTL,
-            rdata = r9_rdata_struct:from_wire(Type, WholeMessage, RdataStartPos)},
+         type = Type,
+         class = CLASS,
+         ttl = TTL,
+         rdata = r9_rdata_struct:from_wire(Type, WholeMessage, RdataStartPos)},
      RdataStartPos + Rdlen}. 
 
 to_wire(RR) ->
@@ -76,8 +79,24 @@ rtype_to_string(?TYPE_AAAA) -> "AAAA";
 rtype_to_string(?TYPE_OPT) -> "OPT";
 rtype_to_string(_) ->  "unknown type".
 
+rtype_from_string("A") -> ?TYPE_A;
+rtype_from_string("NS") -> ?TYPE_NS;
+rtype_from_string("CNAME") -> ?TYPE_CNAME;
+rtype_from_string("SOA") -> ?TYPE_SOA;
+rtype_from_string("PTR") -> ?TYPE_PTR;
+rtype_from_string("AAAA") -> ?TYPE_AAAA;
+rtype_from_string("OPT") -> ?TYPE_OPT;
+rtype_from_string(_) -> 0.
+
+class_from_string("IN") -> ?CLASS_IN.
+class_to_string(?CLASS_IN) -> "IN".
+
 to_string(RR) ->
-    r9_wire_name:to_string(name(RR)) ++ " " ++ rtype_to_string(type(RR)) ++ " " ++ integer_to_list(ttl(RR)) ++ " " ++ r9_rdata_struct:to_string(rdata(RR)).
+    string:join([r9_wire_name:to_string(name(RR)), 
+                  integer_to_list(ttl(RR)), 
+                  class_to_string(class(RR)), 
+                  rtype_to_string(type(RR)), 
+                  r9_rdata_struct:to_string(rdata(RR))], " ").
 
 belongs_to_rrset(RR, RRset) ->
     r9_wire_name:is_equal(r9_rrset:name(RRset), name(RR)) and
@@ -122,6 +141,10 @@ from_wire_test() ->
     ?assertEqual(Expire, 2419200),
     ?assertEqual(Minimum, 21600),
     ?assertEqual(NextPosToParse, 73).
+
+from_to_string_test() ->
+    RR = from_string("test41 3600 IN A 1.1.1.1"),
+    ?assertEqual(to_string(RR), "test41. 3600 IN A 1.1.1.1").
 
 -endif.
 
