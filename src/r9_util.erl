@@ -8,6 +8,7 @@
          ipv4_to_string/1,
          ipv6_to_string/1,
          local_now/0,
+         date_to_string/1,
          string_to_integer/1,
          read_lines/1
         ]).
@@ -65,6 +66,9 @@ read_line(File, Lines)  ->
         eof  -> Lines;
         Line ->  read_line(File, [string:strip(Line, right, $\n) | Lines])
     end.
+
+date_to_string({{Y, M, D}, {H, Min, S}}) ->
+    lists:flatten(io_lib:format("~p-~p-~p ~p:~p:~p", [Y,M,D,H,Min,S])).
 
 %% Tests
 -ifdef(TEST).

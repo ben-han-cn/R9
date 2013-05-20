@@ -2,6 +2,7 @@
 
 -export([from_wire/2,
         to_wire/1,
+        to_string/1,
         name/1,
         type/1,
         class/1,
@@ -40,6 +41,11 @@ id(Name, Type) ->
                   r9_rr:rtype_to_string(Type)]).
 
 
+to_string(Question) ->
+    string:join([r9_wire_name:to_string(name(Question)), 
+                 r9_rr:rtype_to_string(type(Question)), 
+                 r9_rr:class_to_string(class(Question))], " "). 
+ 
 
 
 %%

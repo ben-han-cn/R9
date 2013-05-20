@@ -11,7 +11,8 @@
 -record(state, {
         local_data,
         prev_recursor,
-        next_recursor
+        next_recursor,
+        logger
     }).
 
 -include("r9_resolver.hrl").
@@ -29,10 +30,13 @@ set_next_recursor(NextRecursor) ->
 
 init([Config]) ->
     {ok, LocalZonePath} = r9_config:get(Config, "local_zone_path"),
-    {ok, #state{local_data = r9_local_data:load(LocalZonePath)}}.
+    {ok, Logger} = r9_logger:get_logger(?MODULE),
+    {ok, #state{local_data = r9_local_data:load(LocalZonePath),
+                logger = Logger}}.
 
 handle_call(stop, _From, #state{local_data = LocalData} = State) ->
     r9_local_data:destroy(LocalData),
+    r9_logger:stop(State#state.logger),
     {stop, normal, ok, State};
 
 handle_call(_Request, _From, State) ->
@@ -53,6 +57,7 @@ handle_info({handle_query, #request{question = Question} = Request},
         {ok, LocalMessage} ->
             State#state.prev_recursor ! {handle_response, #response{question = Question, 
                                                                     reply_message = LocalMessage}},
+            r9_logger:log(State#state.logger, lists:concat(["local data hit for ", r9_message_question:to_string(Question)])),
             {noreply, State}; 
         {not_found} ->
             State#state.next_recursor! {handle_query, Request},

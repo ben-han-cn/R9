@@ -237,6 +237,10 @@ from_string(?TYPE_SOA, Data) ->
 from_string(?TYPE_OPT, Code) ->
     #opt{code = r9_util:string_to_integer(Code)};
 
+from_string(?TYPE_TXT, Text) ->
+    io:format("---> ~p", [Text]),
+    #txt{len = length(Text), text = list_to_binary(Text)};
+
 from_string(UnknownType, _Data) ->
     io:format("unknownn from to string ~p ~n", [UnknownType]),
     throw("unknown type").

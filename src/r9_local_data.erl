@@ -11,7 +11,7 @@
 
 load(FileName) ->
     Lines = r9_util:read_lines(FileName),
-    RRsetCache = r9_rrset_cache:create(),
+    RRsetCache = r9_rrset_cache:create([{check_expire, false}]),
     parse_rr(RRsetCache, Lines),
     #local_data{rrset_cache = RRsetCache}.
 

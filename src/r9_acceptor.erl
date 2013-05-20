@@ -10,7 +10,8 @@
 
 -record(state, {
             next_recursor,
-            concurrent_queries
+            concurrent_queries,
+            logger
         }).
 
 -record(query_entry, {
@@ -33,13 +34,16 @@ stop() ->
 
 
 init([]) ->
-    {ok, #state{concurrent_queries = ets:new(message_table, [bag, 
+    {ok, Logger} = r9_logger:get_logger(?MODULE),
+    {ok, #state{logger = Logger,
+                concurrent_queries = ets:new(message_table, [bag, 
                                                              {keypos, #query_entry.id},
                                                              {read_concurrency, true},
                                                              {write_concurrency, true}])}}.
 
 handle_call(stop, _From, #state{concurrent_queries = ConcurrentQueryTable} = State) ->
     ets:delete(ConcurrentQueryTable),
+    r9_logger:stop(State#state.logger),
     {stop, normal, ok, State};
 
 handle_call(_Request, _From, State) ->
@@ -57,6 +61,7 @@ handle_info({accept_request, Socket, Client, Packet},
     {Message, _} = r9_message:from_wire(Packet),
     ID = r9_message_header:id(r9_message:header(Message)),
     Question = r9_message:question(Message),
+    r9_logger:log(State#state.logger, r9_message_question:to_string(Question)),
     Request = #request{id = ID, 
                        question = Question,
                        client = Client,

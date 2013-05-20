@@ -12,7 +12,8 @@
         prev_recursor,
         next_recursor,
         out_queries,
-        socket
+        socket,
+        logger
     }).
 
 -define(ITERATOR, ?MODULE).
@@ -31,16 +32,18 @@ init([]) ->
     case gen_udp:open(5555, [binary]) of
         {ok, Socket} -> io:format("forwarder open socket succeed ~n"),
             {ok, Cache} = r9_cache:start_link(),
+            {ok, Logger} = r9_logger:get_logger(?MODULE),
             {ok, #state{cache = Cache,
                     out_queries = [],
-                    socket = Socket}};
-
+                    socket = Socket,
+                    logger = Logger}};
         {error, Reason} -> io:format("for forwarder open socket failed: ~p ~n", [Reason]),
             {error, Reason}
     end.
 
 
 handle_call(stop, _From, State) ->
+    r9_logger:stop(State#state.logger),
     {stop, normal, ok, State};
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
@@ -53,6 +56,7 @@ handle_cast(_Msg, State) ->
 
 handle_info({udp, _Socket, _IP, _Port, Packet}, #state{prev_recursor = PrevRecursor} = State) ->
     {Message, _} = r9_message:from_wire(Packet, 0),
+    r9_logger:log(State#state.logger, lists:concat(["get response for ", r9_message_question:to_string(r9_message:question(Message))])),
     r9_cache:put_message(Message),
     PrevRecursor ! {handle_response, #response{question = r9_message:question(Message), 
                                                reply_message = Message}},
@@ -63,11 +67,13 @@ handle_info({handle_query, #request{question = Question, client = Client}}, #sta
     case r9_cache:get_message(r9_message_question:name(Question), 
                               r9_message_question:type(Question)) of
         {ok, CachedMessage} ->
+            r9_logger:log(State#state.logger, lists:concat(["cache hit for ", r9_message_question:to_string(Question)])),
             State#state.prev_recursor ! {handle_response, #response{question = Question, 
                                                                     reply_message = CachedMessage}},
             {noreply, NewState}; 
         {not_found} ->
             DelegateQuery = r9_message:to_wire(r9_message:make_query(Question)),
+            r9_logger:log(State#state.logger, lists:concat(["forward query ", r9_message_question:to_string(Question)])),
             case gen_udp:send(Socket, "8.8.8.8", 53, DelegateQuery) of
                 ok -> {noreply, NewState}; 
                 {error, Reason} -> io:format("send query failed: ~p ~n", [Reason]),
