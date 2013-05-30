@@ -10,8 +10,6 @@
 
 -record(state, {
             acceptor,
-            ip,
-            port,
             socket
         }).
 
@@ -49,30 +47,23 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 
-handle_cast({handle_response, IP, Port, Response},  #state{socket = Socket} = State) ->
-    case gen_udp:send(Socket, IP, Port, Response) of
+handle_cast({handle_response, #host{ip = IP, port = Port}, RawMessage},  #state{socket = Socket} = State) ->
+    case gen_udp:send(Socket, IP, Port, RawMessage) of 
         ok -> {noreply, State};
         {error, Reason} -> io:format("send to end user failed ~p ~n", [Reason]),
-                           {stop, Reason, State}
+                           {noreply, State}
     end;
 
 handle_cast(_Msg, State) ->
   {noreply, State}.
 
 handle_info({udp, Socket, IP, Port, Packet}, #state{acceptor = Acceptor} = State) ->
-    Acceptor ! {accept_request, Socket, #host{ip = IP, port = Port}, Packet},
-    {noreply, State#state{ip = IP, port = Port}};
+    Acceptor ! {accept_request, #host{ip = IP, port = Port}, Packet},
+    {noreply, State#state{socket = Socket}}.
 
-handle_info({handle_response, Packet}, #state{socket = Socket, ip = IP, port = Port} = State) ->
-    case gen_udp:send(Socket, IP, Port, Packet) of
-        ok -> {noreply, State}; 
-        {error, Reason} -> io:format("send query failed: ~p ~n", [Reason]),
-            {stop, Reason, State}
-    end.
 
 terminate(_Reason, _State) ->
   ok.
 
 code_change(_OldVsn, State, _Extra) ->
   {ok, State}.
-

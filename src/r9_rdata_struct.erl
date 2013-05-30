@@ -66,7 +66,7 @@ from_wire(?TYPE_PTR, WholeMessage, StartPos) ->
 %+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 from_wire(?TYPE_MX, WholeMessage, StartPos) ->
     <<_ParsedData:StartPos/bytes, Preference:16/big, _/bits>> = WholeMessage,
-    #mx{preference = Preference, exchange = r9_wire_name:from_wire(WholeMessage, StartPos + 2)};
+    #mx{preference = Preference, exchange = element(1, r9_wire_name:from_wire(WholeMessage, StartPos + 2))};
 
 from_wire(?TYPE_AAAA, WholeMessage, StartPos) ->
     <<_ParsedData:StartPos/bytes, IP:128/bits, _/bits>> = WholeMessage,

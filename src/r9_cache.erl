@@ -2,10 +2,10 @@
 -behaviour(gen_server).
 
 -export([start_link/0, 
-         stop/0,
-         put_message/1,
-         get_message/2,
-         get_rrset/2]).
+         stop/1,
+         put_message/2,
+         get_message/3,
+         get_rrset/3]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
@@ -17,38 +17,38 @@
 -define(SERVER, ?MODULE).
 -include("r9_dns.hrl").
 
-start_link() ->
-  gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+start_link() -> 
+    gen_server:start_link(?MODULE, [], []).
 
-stop() ->
-    gen_server:call(?SERVER, stop).
+stop(Pid) ->
+    gen_server:call(Pid, stop).
 
-put_message(Message) ->
-    gen_server:cast(?SERVER, {put_message, Message}).
+put_message(Pid, Message) ->
+    gen_server:cast(Pid, {put_message, Message}).
 
-get_message(Name, Type) ->
-    gen_server:call(?SERVER, {get_message, Name, Type}).
+get_message(Pid, Name, Type) ->
+    gen_server:call(Pid, {get_message, Name, Type}).
 
-get_rrset(Name, Type) ->
-    gen_server:call(?SERVER, {get_rrset, Name, Type}).
+get_rrset(Pid, Name, Type) ->
+    gen_server:call(Pid, {get_rrset, Name, Type}).
 
 init([]) ->
-    {ok, #state{message_cache = r9_message_cache:create()}}.
+    {ok, #state{message_cache = r9_message_redis:create()}}.
 
 handle_call(stop, _From, #state{message_cache = MessageCache} = State) ->
-    r9_message_cache:delete(MessageCache),
+    r9_message_redis:delete(MessageCache),
     {stop, normal, ok, State};
 
 handle_call({get_message, Name, Type}, _From, #state{message_cache = MessageCache} = State) ->
-    {reply, r9_message_cache:find_message(MessageCache, Name, Type), State};                                                 
+    {reply, r9_message_redis:find_message(MessageCache, Name, Type), State};                                                 
 handle_call({get_rrset, Name, Type}, _From, #state{message_cache = MessageCache} = State) ->
-    {reply, r9_message_cache:find_rrset(MessageCache, Name, Type), State};
+    {reply, r9_message_redis:find_rrset(MessageCache, Name, Type), State};
 
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 handle_cast({put_message, Message}, #state{message_cache = MessageCache} = State) ->
-    r9_message_cache:insert_message(MessageCache, Message),
+    r9_message_redis:insert_message(MessageCache, Message),
     {noreply, State};
 
 handle_cast(_Msg, State) ->

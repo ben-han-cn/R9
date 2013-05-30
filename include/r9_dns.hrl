@@ -37,6 +37,10 @@
                    authority_section,
                    additional_section}).
 
+-record(question, {name,
+                   type,
+                   class}).
+
 -record(rr, {name,   
         type,
         class,
@@ -109,6 +113,7 @@
 -define(TYPE_TXT,16).   % Text Strings
 -define(TYPE_AAAA, 16#1c).   % IPV6
 -define(TYPE_OPT, 16#29).   % OPT
+-define(TYPE_ANY, 16#ff).   % ANY
 
 
 -define(CLASS_IN, 1).   % Text Strings

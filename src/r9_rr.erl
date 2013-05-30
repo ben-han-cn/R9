@@ -78,6 +78,8 @@ rtype_to_string(?TYPE_PTR) -> "PTR";
 rtype_to_string(?TYPE_AAAA) -> "AAAA";
 rtype_to_string(?TYPE_OPT) -> "OPT";
 rtype_to_string(?TYPE_TXT) -> "TXT";
+rtype_to_string(?TYPE_MX) -> "MX";
+rtype_to_string(?TYPE_ANY) -> "ANY";
 rtype_to_string(_) ->  "unknown type".
 
 rtype_from_string("A") -> ?TYPE_A;
@@ -88,6 +90,8 @@ rtype_from_string("PTR") -> ?TYPE_PTR;
 rtype_from_string("AAAA") -> ?TYPE_AAAA;
 rtype_from_string("OPT") -> ?TYPE_OPT;
 rtype_from_string("TXT") -> ?TYPE_TXT;
+rtype_from_string("MX") -> ?TYPE_MX;
+rtype_from_string("ANY") -> ?TYPE_ANY;
 rtype_from_string(_) -> 0.
 
 class_from_string("IN") -> ?CLASS_IN.

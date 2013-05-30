@@ -11,9 +11,6 @@
 
 -include("r9_dns.hrl").
 
--record(question, {name,
-                   type,
-                   class}).
 
 name(Question) -> Question#question.name.
 type(Question) -> Question#question.type.

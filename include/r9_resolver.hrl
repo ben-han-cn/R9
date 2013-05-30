@@ -3,8 +3,7 @@
 
 -record(request, {id,
                   question,
-                  client,
-                  socket}).
+                  client}).
 
 -record(response, {question,
                    reply_message}).

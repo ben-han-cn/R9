@@ -54,17 +54,18 @@ handle_cast({set_prev_recursor, PrevRecursor}, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({udp, _Socket, _IP, _Port, Packet}, #state{prev_recursor = PrevRecursor} = State) ->
+handle_info({udp, _Socket, _IP, _Port, Packet}, #state{prev_recursor = PrevRecursor, cache = Cache} = State) ->
     {Message, _} = r9_message:from_wire(Packet, 0),
     r9_logger:log(State#state.logger, lists:concat(["get response for ", r9_message_question:to_string(r9_message:question(Message))])),
-    r9_cache:put_message(Message),
+    r9_cache:put_message(Cache, Message),
     PrevRecursor ! {handle_response, #response{question = r9_message:question(Message), 
                                                reply_message = Message}},
     {noreply, State};
 
-handle_info({handle_query, #request{question = Question, client = Client}}, #state{socket = Socket, out_queries = OutQueries} = State) ->
+handle_info({handle_query, #request{question = Question, client = Client}}, #state{socket = Socket, out_queries = OutQueries, cache = Cache} = State) ->
     NewState = State#state{out_queries = [Client | OutQueries]},
-    case r9_cache:get_message(r9_message_question:name(Question), 
+    case r9_cache:get_message(Cache,
+                              r9_message_question:name(Question), 
                               r9_message_question:type(Question)) of
         {ok, CachedMessage} ->
             r9_logger:log(State#state.logger, lists:concat(["cache hit for ", r9_message_question:to_string(Question)])),
