@@ -140,7 +140,7 @@
               expire,
               minimum}).
 -record(opt, {code, len, data}).
--record(txt, {len, text}).
+-record(txt, {len, textes}).
 
 
 % event

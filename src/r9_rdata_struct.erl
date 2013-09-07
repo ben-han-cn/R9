@@ -85,10 +85,12 @@ from_wire(?TYPE_OPT, _WholeMessage, _StartPos) ->
     #opt{code = 10, data = ""};
 
 
+%% len data len data
 from_wire(?TYPE_TXT, WholeMessage, StartPos) ->
     RdlenPos = StartPos - 2,
     <<_ParsedData:RdlenPos/bytes, Rdlen:16/big, Txt:Rdlen/bytes, _/bits>> = WholeMessage,
-    #txt{len = Rdlen, text = Txt};
+    #txt{len = Rdlen, textes = parse_txt(Txt, [], Rdlen)};
+
 
 from_wire(UnknownType, _, _) ->
     io:format("unknownn from wire ~p ~n", [UnknownType]),
@@ -170,8 +172,11 @@ to_wire(#aaaa{ip = IP}) ->
 to_wire(#opt{code = _Code, len = _Len, data = _Data}) ->
     {0, <<>>};
 
-to_wire(#txt{len = Len, text = Text}) ->
-    {Len, <<Text/binary>>};
+to_wire(#txt{len = Len, textes = Textes}) ->
+    Bin = list_to_binary(lists:foldl(fun(StrBinary, StrBins) -> 
+                    lists:append(StrBins, [byte_size(StrBinary), StrBinary]) 
+            end, [], Textes)),
+    {Len, <<Bin/binary>>};
 
 to_wire(UnknownType) ->
     io:format("unknownn from wire ~p ~n", [UnknownType]),
@@ -207,6 +212,9 @@ to_string(#soa{mname = MName,
 to_string(#opt{code = Code}) ->
     "[opt]" ++ integer_to_list(Code);
 
+to_string(#txt{textes = Texts}) ->
+    "[txt]" ++ string:join(lists:map(fun(Str)-> binary_to_list(Str) end, Texts), " ");
+
 to_string(UnknownType) ->
     io:format("unknownn from to string ~p ~n", [UnknownType]),
     throw("unknown type").
@@ -239,10 +247,20 @@ from_string(?TYPE_OPT, Code) ->
 
 from_string(?TYPE_TXT, Text) ->
     io:format("---> ~p", [Text]),
-    #txt{len = length(Text), text = list_to_binary(Text)};
-
+    Strs = string:tokens(Text, " "),
+    TotalLen = lists:foldl(fun(Str, TotalLen) -> TotalLen + 1 + length(Str) end, 0, Strs),
+    StrBins = lists:map(fun(Str) -> list_to_binary(Str) end, Strs),
+    #txt{textes = StrBins, len = TotalLen};
+        
 from_string(UnknownType, _Data) ->
     io:format("unknownn from to string ~p ~n", [UnknownType]),
     throw("unknown type").
+
+
+%% util
+parse_txt(_Rdata, Strings, LeftLen) when LeftLen == 0 -> Strings;
+parse_txt(Rdata, Strings, LeftLen) ->
+    <<Len:8/integer, Str:Len/bytes, LeftRdata/bits>> = Rdata,
+    parse_txt(LeftRdata, lists:append(Strings, [Str]), LeftLen - Len - 1).
 
 
